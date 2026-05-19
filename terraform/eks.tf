@@ -8,7 +8,7 @@ module "eks" {
   subnet_ids = module.vpc.private_subnets
   vpc_id     = module.vpc.vpc_id
 
-  enable_cluster_creator_admin_permissions = false
+  enable_cluster_creator_admin_permissions = true
 
 
   iam_role_arn = aws_iam_role.eks_cluster_role.arn
