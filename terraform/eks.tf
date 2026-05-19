@@ -10,19 +10,34 @@ module "eks" {
 
   enable_cluster_creator_admin_permissions = true
 
+
+  iam_role_arn = aws_iam_role.eks_cluster_role.arn
+
   eks_managed_node_groups = {
     production = {
+
       desired_size = 2
       max_size     = 3
       min_size     = 2
 
-      instance_types = ["t2.medium"]
+      instance_types = ["t3.medium"]
 
       capacity_type = "ON_DEMAND"
+
+      iam_role_arn = aws_iam_role.eks_node_group_role.arn
     }
   }
+
 
   tags = {
     Environment = "production"
   }
+
+
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_cluster_policy,
+    aws_iam_role_policy_attachment.worker_node_policy,
+    aws_iam_role_policy_attachment.ecr_readonly_policy,
+    aws_iam_role_policy_attachment.cni_policy
+  ]
 }
