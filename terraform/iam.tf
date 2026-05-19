@@ -1,7 +1,3 @@
-############################
-# EKS Cluster IAM Role
-############################
-
 resource "aws_iam_role" "eks_cluster_role" {
   name = "eks-cluster-role"
 
@@ -20,9 +16,6 @@ resource "aws_iam_role" "eks_cluster_role" {
   })
 }
 
-############################
-# Attach EKS Cluster Policy
-############################
 
 resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
@@ -30,9 +23,6 @@ resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
   role = aws_iam_role.eks_cluster_role.name
 }
 
-############################
-# Worker Node IAM Role
-############################
 
 resource "aws_iam_role" "eks_node_group_role" {
   name = "eks-node-group-role"
@@ -52,9 +42,6 @@ resource "aws_iam_role" "eks_node_group_role" {
   })
 }
 
-############################
-# Worker Node Policies
-############################
 
 resource "aws_iam_role_policy_attachment" "worker_node_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
