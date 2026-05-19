@@ -1,5 +1,6 @@
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
   name: nodejs-app
   namespace: production
@@ -20,6 +21,7 @@ spec:
       containers:
       - name: nodejs-app
         image: 728980333971.dkr.ecr.ap-south-1.amazonaws.com/nodejs-app:latest
+        imagePullPolicy: Always
 
         ports:
         - containerPort: 3000
