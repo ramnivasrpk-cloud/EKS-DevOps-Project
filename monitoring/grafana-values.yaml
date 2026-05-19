@@ -1,4 +1,4 @@
-adminPassword: admin123
+adminPassword: Grafana@12345
 
 service:
   type: LoadBalancer
