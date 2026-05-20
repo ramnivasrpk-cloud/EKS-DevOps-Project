@@ -1,0 +1,174 @@
+pipeline {
+    agent any
+
+    parameters {
+        booleanParam(
+            name: 'VALIDATE_TERRAFORM',
+            defaultValue: true,
+            description: 'Validate Terraform'
+        )
+
+        booleanParam(
+            name: 'PLAN_TERRAFORM',
+            defaultValue: true,
+            description: 'Plan Terraform'
+        )
+
+        booleanParam(
+            name: 'APPLY_TERRAFORM',
+            defaultValue: false,
+            description: 'Apply Terraform'
+        )
+
+        booleanParam(
+            name: 'DESTROY_TERRAFORM',
+            defaultValue: false,
+            description: 'Destroy Terraform'
+        )
+    }
+
+    environment {
+        AWS_REGION = 'ap-south-1'
+        CLUSTER_NAME = 'production-eks-cluster'
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main',
+                url: 'https://github.com/ramnivasrpk-cloud/EKS-DevOps-Project.git'
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                dir('terraform') {
+                    sh 'terraform init'
+                }
+            }
+        }
+
+        stage('Terraform Validate') {
+            when {
+                expression { params.VALIDATE_TERRAFORM }
+            }
+
+            steps {
+                dir('terraform') {
+                    sh 'terraform validate'
+                }
+            }
+        }
+
+        stage('Terraform Plan') {
+            when {
+                expression { params.PLAN_TERRAFORM }
+            }
+
+            steps {
+                dir('terraform') {
+                    sh 'terraform plan'
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            when {
+                expression { params.APPLY_TERRAFORM }
+            }
+
+            steps {
+                dir('terraform') {
+                    sh 'terraform apply -auto-approve'
+                }
+            }
+        }
+
+        stage('Update kubeconfig') {
+            when {
+                expression { params.APPLY_TERRAFORM }
+            }
+
+            steps {
+                sh '''
+                aws eks update-kubeconfig \
+                --region $AWS_REGION \
+                --name $CLUSTER_NAME
+                '''
+            }
+        }
+
+        stage('Install NGINX Ingress') {
+            when {
+                expression { params.APPLY_TERRAFORM }
+            }
+
+            steps {
+                sh '''
+                helm repo add ingress-nginx \
+                https://kubernetes.github.io/ingress-nginx
+
+                helm repo update
+
+                helm upgrade --install nginx-ingress \
+                ingress-nginx/ingress-nginx \
+                --namespace ingress-nginx \
+                --create-namespace
+                '''
+            }
+        }
+
+        stage('Install Prometheus') {
+            when {
+                expression { params.APPLY_TERRAFORM }
+            }
+
+            steps {
+                sh '''
+                helm repo add prometheus-community \
+                https://prometheus-community.github.io/helm-charts
+
+                helm repo update
+
+                helm upgrade --install prometheus \
+                prometheus-community/prometheus \
+                --namespace monitoring \
+                --create-namespace
+                '''
+            }
+        }
+
+        stage('Install Grafana') {
+            when {
+                expression { params.APPLY_TERRAFORM }
+            }
+
+            steps {
+                sh '''
+                helm repo add grafana \
+                https://grafana.github.io/helm-charts
+
+                helm repo update
+
+                helm upgrade --install grafana \
+                grafana/grafana \
+                --namespace monitoring \
+                --create-namespace
+                '''
+            }
+        }
+
+        stage('Terraform Destroy') {
+            when {
+                expression { params.DESTROY_TERRAFORM }
+            }
+
+            steps {
+                dir('terraform') {
+                    sh 'terraform destroy -auto-approve'
+                }
+            }
+        }
+    }
+}
