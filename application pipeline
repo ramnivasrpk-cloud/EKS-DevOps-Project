@@ -1,0 +1,102 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = 'ap-south-1'
+        ECR_REPO = 'nodejs-app'
+        ECR_REGISTRY = '728980333971.dkr.ecr.ap-south-1.amazonaws.com'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main',
+                url: 'https://github.com/ramnivasrpk-cloud/EKS-DevOps-Project.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                docker build -t $ECR_REPO:$IMAGE_TAG ./app
+                '''
+            }
+        }
+
+        stage('Trivy Scan') {
+            steps {
+                sh '''
+                trivy image --exit-code 0 \
+                --severity HIGH,CRITICAL \
+                $ECR_REPO:$IMAGE_TAG
+                '''
+            }
+        }
+
+        stage('Login to ECR') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-credentials'
+                ]]) {
+
+                    sh '''
+                    aws ecr get-login-password \
+                    --region $AWS_REGION | \
+                    docker login \
+                    --username AWS \
+                    --password-stdin $ECR_REGISTRY
+                    '''
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                sh '''
+                # Tag with build number
+                docker tag $ECR_REPO:$IMAGE_TAG \
+                $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
+
+                # Tag as latest
+                docker tag $ECR_REPO:$IMAGE_TAG \
+                $ECR_REGISTRY/$ECR_REPO:latest
+
+                # Push build number tag
+                docker push \
+                $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
+
+                # Push latest tag
+                docker push \
+                $ECR_REGISTRY/$ECR_REPO:latest
+                '''
+            }
+        }
+
+        stage('Deploy to EKS') {
+            steps {
+                sh '''
+                aws eks update-kubeconfig \
+                --region ap-south-1 \
+                --name production-eks-cluster
+
+                # Create namespace first
+                kubectl apply -f k8s/namespace.yaml
+
+                sleep 10
+
+                # Deploy application
+                kubectl apply -f k8s/secret.yaml
+                kubectl apply -f k8s/service.yaml
+                kubectl apply -f k8s/deployment.yaml
+                kubectl apply -f k8s/ingress.yaml
+
+                kubectl rollout restart deployment nodejs-app \
+                -n production
+                '''
+            }
+        }
+    }
+}
